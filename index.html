@@ -304,7 +304,7 @@
             if (countdownInterval) clearInterval(countdownInterval);
         }
 
-        // Search for live streams
+        // Search for live streams with pagination to get more results
         async function searchLiveStreams() {
             if (!accessToken) {
                 showStatus('Please connect your YouTube account first!', true);
@@ -315,32 +315,48 @@
             document.getElementById('searchButton').disabled = true;
 
             try {
-                // Search for live broadcasts
-                const response = await fetch(
-                    `https://www.googleapis.com/youtube/v3/search?` +
-                    `part=snippet&` +
-                    `eventType=live&` +
-                    `type=video&` +
-                    `maxResults=50&` +
-                    `videoCategoryId=29&` + // Music category, you can change this
-                    `q=live camera OR webcam OR live view`, // Search query
-                    {
+                liveStreams = [];
+                let nextPageToken = null;
+                const maxPages = 4; // Fetch 4 pages (50 per page = 200 total)
+                let pageCount = 0;
+
+                // Fetch multiple pages
+                do {
+                    pageCount++;
+                    showStatus(`🔍 Searching for live streams... (Page ${pageCount}/${maxPages})`);
+
+                    const url = `https://www.googleapis.com/youtube/v3/search?` +
+                        `part=snippet&` +
+                        `eventType=live&` +
+                        `type=video&` +
+                        `maxResults=50&` +
+                        `q=live camera OR webcam OR live view` + // Search query
+                        (nextPageToken ? `&pageToken=${nextPageToken}` : '');
+
+                    const response = await fetch(url, {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`
                         }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.items && data.items.length > 0) {
+                        const newStreams = data.items.map(item => ({
+                            id: item.id.videoId,
+                            title: item.snippet.title,
+                            channel: item.snippet.channelTitle,
+                            thumbnail: item.snippet.thumbnails.medium.url
+                        }));
+                        
+                        liveStreams = liveStreams.concat(newStreams);
                     }
-                );
 
-                const data = await response.json();
+                    nextPageToken = data.nextPageToken;
 
-                if (data.items && data.items.length > 0) {
-                    liveStreams = data.items.map(item => ({
-                        id: item.id.videoId,
-                        title: item.snippet.title,
-                        channel: item.snippet.channelTitle,
-                        thumbnail: item.snippet.thumbnails.medium.url
-                    }));
+                } while (nextPageToken && pageCount < maxPages);
 
+                if (liveStreams.length > 0) {
                     showStatus(`✅ Found ${liveStreams.length} live streams!`);
                     displayPlaylist();
                     createPlayer();
