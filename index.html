@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Live Stream Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .auth-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .player-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        #player {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 8px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .timer {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .playlist-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .playlist-section h2 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .stream-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .stream-item:hover {
+            background: #f0f0f0;
+            transform: translateX(5px);
+        }
+
+        .stream-item.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .stream-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stream-channel {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .stream-item.active .stream-channel {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .status {
+            text-align: center;
+            color: white;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .info-box h3 {
+            margin-bottom: 10px;
+        }
+
+        .info-box ol {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 YouTube Live Stream Viewer</h1>
+
+        <div class="info-box">
+            <h3>Setup Instructions:</h3>
+            <ol>
+                <li>Go to <a href="https://console.cloud.google.com/" target="_blank" style="color: #ffd700;">Google Cloud Console</a></li>
+                <li>Create a new project or select an existing one</li>
+                <li>Enable the "YouTube Data API v3"</li>
+                <li>Create credentials (OAuth 2.0 Client ID for Web application)</li>
+                <li>Add your website URL to authorized JavaScript origins (e.g., <code>https://YOUR-USERNAME.github.io</code>)</li>
+                <li>Copy your Client ID and paste it below (it will be saved in your browser)</li>
+            </ol>
+        </div>
+
+        <div class="auth-section">
+            <input type="text" id="clientIdInput" placeholder="Paste your YouTube API Client ID here" 
+                   style="width: 500px; padding: 15px; border-radius: 8px; border: 2px solid white; margin-right: 10px; font-size: 14px;">
+            <button id="authButton" onclick="handleAuth()">Connect YouTube Account</button>
+            <button id="searchButton" onclick="searchLiveStreams()" style="display: none;">Find Live Streams</button>
+            <button id="signoutButton" onclick="handleSignout()" style="display: none; background: #ff4444;">Sign Out</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="player-section" style="display: none;" id="playerSection">
+            <div id="player"></div>
+            <div class="controls">
+                <div class="timer">Next stream in: <span id="countdown">10</span>s</div>
+                <div>
+                    <button onclick="previousStream()">⏮ Previous</button>
+                    <button onclick="toggleAutoSwitch()" id="autoSwitchBtn">⏸ Pause Auto-Switch</button>
+                    <button onclick="nextStream()">Next ⏭</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="playlist-section" style="display: none;" id="playlistSection">
+            <h2>Live Streams Found: <span id="streamCount">0</span></h2>
+            <div id="playlist"></div>
+        </div>
+    </div>
+
+    <!-- Load the YouTube IFrame Player API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    
+    <!-- Load Google API Client -->
+    <script src="https://accounts.google.com/gsi/client"></script>
+
+    <script>
+        // YouTube API Configuration
+        let CLIENT_ID = '';
+        const API_KEY = 'YOUR_API_KEY'; // You'll also need an API key for search
+        const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
+        
+        // App state
+        let tokenClient;
+        let accessToken = null;
+        let player;
+        let liveStreams = [];
+        let currentStreamIndex = 0;
+        let autoSwitchEnabled = true;
+        let countdownInterval;
+        let countdownValue = 10;
+
+        // Initialize when YouTube API is ready
+        function onYouTubeIframeAPIReady() {
+            console.log('YouTube IFrame API ready');
+        }
+
+        // Load saved Client ID on page load
+        window.addEventListener('load', () => {
+            const savedClientId = localStorage.getItem('youtube_client_id');
+            if (savedClientId) {
+                document.getElementById('clientIdInput').value = savedClientId;
+            }
+        });
+
+        // Handle authentication
+        function handleAuth() {
+            CLIENT_ID = document.getElementById('clientIdInput').value.trim();
+            
+            if (!CLIENT_ID) {
+                showStatus('Please enter your Client ID first!', true);
+                return;
+            }
+
+            // Save Client ID to browser storage
+            localStorage.setItem('youtube_client_id', CLIENT_ID);
+
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (response) => {
+                    if (response.access_token) {
+                        accessToken = response.access_token;
+                        showStatus('✅ Successfully connected to YouTube!');
+                        document.getElementById('authButton').style.display = 'none';
+                        document.getElementById('searchButton').style.display = 'inline-block';
+                        document.getElementById('signoutButton').style.display = 'inline-block';
+                        document.getElementById('clientIdInput').style.display = 'none';
+                    }
+                },
+            });
+
+            tokenClient.requestAccessToken();
+        }
+
+        // Sign out
+        function handleSignout() {
+            accessToken = null;
+            liveStreams = [];
+            currentStreamIndex = 0;
+            document.getElementById('authButton').style.display = 'inline-block';
+            document.getElementById('searchButton').style.display = 'none';
+            document.getElementById('signoutButton').style.display = 'none';
+            document.getElementById('playerSection').style.display = 'none';
+            document.getElementById('playlistSection').style.display = 'none';
+            document.getElementById('clientIdInput').style.display = 'inline-block';
+            showStatus('Signed out successfully');
+            if (countdownInterval) clearInterval(countdownInterval);
+        }
+
+        // Search for live streams
+        async function searchLiveStreams() {
+            if (!accessToken) {
+                showStatus('Please connect your YouTube account first!', true);
+                return;
+            }
+
+            showStatus('🔍 Searching for live streams...');
+            document.getElementById('searchButton').disabled = true;
+
+            try {
+                // Search for live broadcasts
+                const response = await fetch(
+                    `https://www.googleapis.com/youtube/v3/search?` +
+                    `part=snippet&` +
+                    `eventType=live&` +
+                    `type=video&` +
+                    `maxResults=50&` +
+                    `videoCategoryId=29&` + // Music category, you can change this
+                    `q=live camera OR webcam OR live view`, // Search query
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    }
+                );
+
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    liveStreams = data.items.map(item => ({
+                        id: item.id.videoId,
+                        title: item.snippet.title,
+                        channel: item.snippet.channelTitle,
+                        thumbnail: item.snippet.thumbnails.medium.url
+                    }));
+
+                    showStatus(`✅ Found ${liveStreams.length} live streams!`);
+                    displayPlaylist();
+                    createPlayer();
+                } else {
+                    showStatus('No live streams found. Try searching again!', true);
+                }
+            } catch (error) {
+                console.error('Error searching:', error);
+                showStatus('Error searching for streams. Check console for details.', true);
+            } finally {
+                document.getElementById('searchButton').disabled = false;
+            }
+        }
+
+        // Create YouTube player
+        function createPlayer() {
+            if (!player) {
+                player = new YT.Player('player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: liveStreams[0].id,
+                    playerVars: {
+                        autoplay: 1,
+                        controls: 1,
+                        modestbranding: 1,
+                    },
+                    events: {
+                        onReady: onPlayerReady,
+                    }
+                });
+            } else {
+                player.loadVideoById(liveStreams[0].id);
+            }
+
+            document.getElementById('playerSection').style.display = 'block';
+        }
+
+        // Player ready
+        function onPlayerReady(event) {
+            event.target.playVideo();
+            startCountdown();
+        }
+
+        // Display playlist
+        function displayPlaylist() {
+            const playlistDiv = document.getElementById('playlist');
+            playlistDiv.innerHTML = '';
+            
+            liveStreams.forEach((stream, index) => {
+                const streamDiv = document.createElement('div');
+                streamDiv.className = 'stream-item' + (index === 0 ? ' active' : '');
+                streamDiv.onclick = () => playStream(index);
+                streamDiv.innerHTML = `
+                    <div class="stream-title">${stream.title}</div>
+                    <div class="stream-channel">${stream.channel}</div>
+                `;
+                playlistDiv.appendChild(streamDiv);
+            });
+
+            document.getElementById('streamCount').textContent = liveStreams.length;
+            document.getElementById('playlistSection').style.display = 'block';
+        }
+
+        // Play specific stream
+        function playStream(index) {
+            currentStreamIndex = index;
+            if (player && player.loadVideoById) {
+                player.loadVideoById(liveStreams[index].id);
+            }
+            updateActiveStream();
+            resetCountdown();
+        }
+
+        // Next stream
+        function nextStream() {
+            currentStreamIndex = (currentStreamIndex + 1) % liveStreams.length;
+            playStream(currentStreamIndex);
+        }
+
+        // Previous stream
+        function previousStream() {
+            currentStreamIndex = (currentStreamIndex - 1 + liveStreams.length) % liveStreams.length;
+            playStream(currentStreamIndex);
+        }
+
+        // Update active stream in playlist
+        function updateActiveStream() {
+            document.querySelectorAll('.stream-item').forEach((item, index) => {
+                item.classList.toggle('active', index === currentStreamIndex);
+            });
+        }
+
+        // Countdown timer
+        function startCountdown() {
+            resetCountdown();
+            countdownInterval = setInterval(() => {
+                if (!autoSwitchEnabled) return;
+                
+                countdownValue--;
+                document.getElementById('countdown').textContent = countdownValue;
+                
+                if (countdownValue <= 0) {
+                    nextStream();
+                }
+            }, 1000);
+        }
+
+        function resetCountdown() {
+            countdownValue = 10;
+            document.getElementById('countdown').textContent = countdownValue;
+        }
+
+        // Toggle auto-switch
+        function toggleAutoSwitch() {
+            autoSwitchEnabled = !autoSwitchEnabled;
+            const btn = document.getElementById('autoSwitchBtn');
+            btn.textContent = autoSwitchEnabled ? '⏸ Pause Auto-Switch' : '▶ Resume Auto-Switch';
+            
+            if (autoSwitchEnabled) {
+                resetCountdown();
+            }
+        }
+
+        // Show status message
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = isError ? 'error' : 'status';
+        }
+    </script>
+</body>
+</html>
