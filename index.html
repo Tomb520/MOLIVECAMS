@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -176,20 +176,18 @@
         <h1>🎥 YouTube Live Stream Viewer</h1>
 
         <div class="info-box">
-            <h3>Setup Instructions:</h3>
+            <h3>Welcome to YouTube Live Stream Viewer! 🎥</h3>
+            <p>This app lets you discover and watch live streams from around the world, automatically switching between them every 10 seconds.</p>
+            <p><strong>To get started:</strong></p>
             <ol>
-                <li>Go to <a href="https://console.cloud.google.com/" target="_blank" style="color: #ffd700;">Google Cloud Console</a></li>
-                <li>Create a new project or select an existing one</li>
-                <li>Enable the "YouTube Data API v3"</li>
-                <li>Create credentials (OAuth 2.0 Client ID for Web application)</li>
-                <li>Add your website URL to authorized JavaScript origins (e.g., <code>https://YOUR-USERNAME.github.io</code>)</li>
-                <li>Copy your Client ID and paste it below (it will be saved in your browser)</li>
+                <li>Click "Connect YouTube Account" below</li>
+                <li>Sign in with your Google account</li>
+                <li>Authorize the app to access YouTube</li>
+                <li>Click "Find Live Streams" to start watching!</li>
             </ol>
         </div>
 
         <div class="auth-section">
-            <input type="text" id="clientIdInput" placeholder="Paste your YouTube API Client ID here" 
-                   style="width: 500px; padding: 15px; border-radius: 8px; border: 2px solid white; margin-right: 10px; font-size: 14px;">
             <button id="authButton" onclick="handleAuth()">Connect YouTube Account</button>
             <button id="searchButton" onclick="searchLiveStreams()" style="display: none;">Find Live Streams</button>
             <button id="signoutButton" onclick="handleSignout()" style="display: none; background: #ff4444;">Sign Out</button>
@@ -223,7 +221,7 @@
 
     <script>
         // YouTube API Configuration
-        let CLIENT_ID = '';
+        const CLIENT_ID = '630222758042-aqp8bvmtruskb05lskuimehkr0a29hk9.apps.googleusercontent.com';
         const API_KEY = 'YOUR_API_KEY'; // You'll also need an API key for search
         const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
         
@@ -242,25 +240,12 @@
             console.log('YouTube IFrame API ready');
         }
 
-        // Load saved Client ID on page load
-        window.addEventListener('load', () => {
-            const savedClientId = localStorage.getItem('youtube_client_id');
-            if (savedClientId) {
-                document.getElementById('clientIdInput').value = savedClientId;
-            }
-        });
-
         // Handle authentication
         function handleAuth() {
-            CLIENT_ID = document.getElementById('clientIdInput').value.trim();
-            
             if (!CLIENT_ID) {
-                showStatus('Please enter your Client ID first!', true);
+                showStatus('Configuration error. Please contact the site administrator.', true);
                 return;
             }
-
-            // Save Client ID to browser storage
-            localStorage.setItem('youtube_client_id', CLIENT_ID);
 
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
@@ -272,7 +257,6 @@
                         document.getElementById('authButton').style.display = 'none';
                         document.getElementById('searchButton').style.display = 'inline-block';
                         document.getElementById('signoutButton').style.display = 'inline-block';
-                        document.getElementById('clientIdInput').style.display = 'none';
                     }
                 },
             });
@@ -290,7 +274,6 @@
             document.getElementById('signoutButton').style.display = 'none';
             document.getElementById('playerSection').style.display = 'none';
             document.getElementById('playlistSection').style.display = 'none';
-            document.getElementById('clientIdInput').style.display = 'inline-block';
             showStatus('Signed out successfully');
             if (countdownInterval) clearInterval(countdownInterval);
         }
