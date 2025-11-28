@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -213,11 +213,11 @@
         </div>
     </div>
 
+    <!-- Load Google API Client -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <!-- Load the YouTube IFrame Player API -->
     <script src="https://www.youtube.com/iframe_api"></script>
-    
-    <!-- Load Google API Client -->
-    <script src="https://accounts.google.com/gsi/client"></script>
 
     <script>
         // YouTube API Configuration
@@ -240,8 +240,34 @@
             console.log('YouTube IFrame API ready');
         }
 
+        // Check when page is fully loaded
+        window.addEventListener('load', () => {
+            // Wait for Google API to be available
+            let checkCount = 0;
+            const checkGoogleAPI = setInterval(() => {
+                checkCount++;
+                if (typeof google !== 'undefined') {
+                    clearInterval(checkGoogleAPI);
+                    showStatus('✅ Ready! Click "Connect YouTube Account" to start');
+                } else if (checkCount > 20) {
+                    clearInterval(checkGoogleAPI);
+                    showStatus('⚠️ Having trouble loading. Please refresh the page.', true);
+                }
+            }, 200);
+        });
+
         // Handle authentication
         function handleAuth() {
+            // Check if Google API is loaded
+            if (typeof google === 'undefined') {
+                showStatus('Loading Google API... Please wait a moment and try again.', true);
+                // Retry after a short delay
+                setTimeout(() => {
+                    showStatus('Ready to connect!');
+                }, 2000);
+                return;
+            }
+
             if (!CLIENT_ID) {
                 showStatus('Configuration error. Please contact the site administrator.', true);
                 return;
