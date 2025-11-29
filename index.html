@@ -65,13 +65,22 @@
             padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             margin-bottom: 20px;
+            position: relative;
         }
 
-        #player {
+        #player, #player-preload {
             width: 100%;
             aspect-ratio: 16 / 9;
             background: #000;
             border-radius: 8px;
+            transition: opacity 0.3s ease;
+        }
+
+        #player-preload {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
         }
 
         .controls {
@@ -197,6 +206,7 @@
 
         <div class="player-section" style="display: none;" id="playerSection">
             <div id="player"></div>
+            <div id="player-preload" style="display: none;"></div>
             <div class="controls">
                 <div class="timer">Next stream in: <span id="countdown">10</span>s</div>
                 <div>
@@ -229,6 +239,8 @@
         let tokenClient;
         let accessToken = null;
         let player;
+        let preloadPlayer;
+        let activePlayer = 'main'; // Track which player is currently visible
         let liveStreams = [];
         let currentStreamIndex = 0;
         let autoSwitchEnabled = true;
@@ -387,8 +399,23 @@
                         onReady: onPlayerReady,
                     }
                 });
+                
+                // Create preload player (hidden)
+                preloadPlayer = new YT.Player('player-preload', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: liveStreams[1] ? liveStreams[1].id : liveStreams[0].id,
+                    playerVars: {
+                        autoplay: 0,
+                        controls: 1,
+                        modestbranding: 1,
+                    }
+                });
             } else {
                 player.loadVideoById(liveStreams[0].id);
+                if (liveStreams[1]) {
+                    preloadPlayer.cueVideoById(liveStreams[1].id);
+                }
             }
 
             document.getElementById('playerSection').style.display = 'block';
@@ -398,6 +425,8 @@
         function onPlayerReady(event) {
             event.target.playVideo();
             startCountdown();
+            // Preload next video
+            preloadNextVideo();
         }
 
         // Display playlist
@@ -420,12 +449,48 @@
             document.getElementById('playlistSection').style.display = 'block';
         }
 
-        // Play specific stream
+        // Preload the next video
+        function preloadNextVideo() {
+            if (!preloadPlayer || liveStreams.length <= 1) return;
+            
+            const nextIndex = (currentStreamIndex + 1) % liveStreams.length;
+            const nextVideoId = liveStreams[nextIndex].id;
+            
+            // Cue the next video (loads it without playing)
+            preloadPlayer.cueVideoById(nextVideoId);
+        }
+
+        // Play specific stream with seamless transition
         function playStream(index) {
             currentStreamIndex = index;
-            if (player && player.loadVideoById) {
+            
+            // Swap players for instant transition
+            if (activePlayer === 'main') {
+                // Load video in preload player and make it visible
+                preloadPlayer.loadVideoById(liveStreams[index].id);
+                document.getElementById('player').style.display = 'none';
+                document.getElementById('player-preload').style.display = 'block';
+                activePlayer = 'preload';
+                
+                // Preload next video in main player
+                setTimeout(() => {
+                    const nextIndex = (index + 1) % liveStreams.length;
+                    player.cueVideoById(liveStreams[nextIndex].id);
+                }, 1000);
+            } else {
+                // Load video in main player and make it visible
                 player.loadVideoById(liveStreams[index].id);
+                document.getElementById('player-preload').style.display = 'none';
+                document.getElementById('player').style.display = 'block';
+                activePlayer = 'main';
+                
+                // Preload next video in preload player
+                setTimeout(() => {
+                    const nextIndex = (index + 1) % liveStreams.length;
+                    preloadPlayer.cueVideoById(liveStreams[nextIndex].id);
+                }, 1000);
             }
+            
             updateActiveStream();
             resetCountdown();
         }
