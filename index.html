@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #800020 0%, #000000 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -38,7 +38,7 @@
 
         button {
             background: white;
-            color: #667eea;
+            color: #800020;
             border: none;
             padding: 15px 30px;
             font-size: 16px;
@@ -52,6 +52,7 @@
         button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+            background: #f0f0f0;
         }
 
         button:disabled {
@@ -65,22 +66,18 @@
             padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             margin-bottom: 20px;
-            position: relative;
         }
 
-        #player, #player-preload {
+        #player {
             width: 100%;
             aspect-ratio: 16 / 9;
             background: #000;
             border-radius: 8px;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.5s ease;
         }
 
-        #player-preload {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+        #player.fade-out {
+            opacity: 0.3;
         }
 
         .controls {
@@ -96,7 +93,7 @@
         .timer {
             font-size: 18px;
             font-weight: bold;
-            color: #667eea;
+            color: #800020;
         }
 
         .playlist-section {
@@ -110,7 +107,7 @@
 
         .playlist-section h2 {
             margin-bottom: 15px;
-            color: #667eea;
+            color: #800020;
         }
 
         .stream-item {
@@ -118,7 +115,7 @@
             margin-bottom: 10px;
             background: #f9f9f9;
             border-radius: 6px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #800020;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -129,7 +126,7 @@
         }
 
         .stream-item.active {
-            background: #667eea;
+            background: #800020;
             color: white;
         }
 
@@ -182,7 +179,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎥 YouTube Live Stream Viewer</h1>
+        <h1>🌐 MOLIVECAMS</h1>
 
         <div class="info-box">
             <h3>Welcome to YouTube Live Stream Viewer! 🎥</h3>
@@ -206,7 +203,6 @@
 
         <div class="player-section" style="display: none;" id="playerSection">
             <div id="player"></div>
-            <div id="player-preload" style="display: none;"></div>
             <div class="controls">
                 <div class="timer">Next stream in: <span id="countdown">10</span>s</div>
                 <div>
@@ -239,13 +235,12 @@
         let tokenClient;
         let accessToken = null;
         let player;
-        let preloadPlayer;
-        let activePlayer = 'main'; // Track which player is currently visible
         let liveStreams = [];
         let currentStreamIndex = 0;
         let autoSwitchEnabled = true;
         let countdownInterval;
         let countdownValue = 10;
+        let preloadTriggered = false;
 
         // Initialize when YouTube API is ready
         function onYouTubeIframeAPIReady() {
@@ -394,28 +389,15 @@
                         autoplay: 1,
                         controls: 1,
                         modestbranding: 1,
+                        rel: 0,
                     },
                     events: {
                         onReady: onPlayerReady,
-                    }
-                });
-                
-                // Create preload player (hidden)
-                preloadPlayer = new YT.Player('player-preload', {
-                    height: '100%',
-                    width: '100%',
-                    videoId: liveStreams[1] ? liveStreams[1].id : liveStreams[0].id,
-                    playerVars: {
-                        autoplay: 0,
-                        controls: 1,
-                        modestbranding: 1,
+                        onStateChange: onPlayerStateChange,
                     }
                 });
             } else {
                 player.loadVideoById(liveStreams[0].id);
-                if (liveStreams[1]) {
-                    preloadPlayer.cueVideoById(liveStreams[1].id);
-                }
             }
 
             document.getElementById('playerSection').style.display = 'block';
@@ -425,8 +407,16 @@
         function onPlayerReady(event) {
             event.target.playVideo();
             startCountdown();
-            // Preload next video
-            preloadNextVideo();
+        }
+
+        // Player state change - detect when video is playing
+        function onPlayerStateChange(event) {
+            // When video starts playing, trigger preload at 3 seconds
+            if (event.data === YT.PlayerState.PLAYING && !preloadTriggered) {
+                setTimeout(() => {
+                    preloadNextVideo();
+                }, 3000); // Start preloading after 3 seconds
+            }
         }
 
         // Display playlist
@@ -449,50 +439,56 @@
             document.getElementById('playlistSection').style.display = 'block';
         }
 
-        // Preload the next video
+        // Preload the next video using iframe preloading technique
         function preloadNextVideo() {
-            if (!preloadPlayer || liveStreams.length <= 1) return;
+            if (liveStreams.length <= 1) return;
             
             const nextIndex = (currentStreamIndex + 1) % liveStreams.length;
             const nextVideoId = liveStreams[nextIndex].id;
             
-            // Cue the next video (loads it without playing)
-            preloadPlayer.cueVideoById(nextVideoId);
+            // Create a hidden iframe to trigger browser caching
+            const preloadFrame = document.getElementById('preload-frame');
+            if (preloadFrame) {
+                preloadFrame.remove();
+            }
+            
+            const iframe = document.createElement('iframe');
+            iframe.id = 'preload-frame';
+            iframe.style.display = 'none';
+            iframe.src = `https://www.youtube.com/embed/${nextVideoId}`;
+            document.body.appendChild(iframe);
+            
+            preloadTriggered = true;
         }
 
-        // Play specific stream with seamless transition
+        // Play specific stream
         function playStream(index) {
             currentStreamIndex = index;
+            preloadTriggered = false;
             
-            // Swap players for instant transition
-            if (activePlayer === 'main') {
-                // Load video in preload player and make it visible
-                preloadPlayer.loadVideoById(liveStreams[index].id);
-                document.getElementById('player').style.display = 'none';
-                document.getElementById('player-preload').style.display = 'block';
-                activePlayer = 'preload';
+            if (player && player.loadVideoById) {
+                // Add fade out effect
+                const playerDiv = document.getElementById('player');
+                playerDiv.classList.add('fade-out');
                 
-                // Preload next video in main player
+                // Load new video after brief fade
                 setTimeout(() => {
-                    const nextIndex = (index + 1) % liveStreams.length;
-                    player.cueVideoById(liveStreams[nextIndex].id);
-                }, 1000);
-            } else {
-                // Load video in main player and make it visible
-                player.loadVideoById(liveStreams[index].id);
-                document.getElementById('player-preload').style.display = 'none';
-                document.getElementById('player').style.display = 'block';
-                activePlayer = 'main';
-                
-                // Preload next video in preload player
-                setTimeout(() => {
-                    const nextIndex = (index + 1) % liveStreams.length;
-                    preloadPlayer.cueVideoById(liveStreams[nextIndex].id);
-                }, 1000);
+                    player.loadVideoById(liveStreams[index].id);
+                    
+                    // Fade back in after video starts loading
+                    setTimeout(() => {
+                        playerDiv.classList.remove('fade-out');
+                    }, 300);
+                }, 200);
             }
             
             updateActiveStream();
             resetCountdown();
+            
+            // Preload next video after a short delay
+            setTimeout(() => {
+                preloadNextVideo();
+            }, 3000);
         }
 
         // Next stream
